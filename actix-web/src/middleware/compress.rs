@@ -8,7 +8,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use actix_http::encoding::Encoder;
+use actix_http::{encoding::Encoder, ContentEncoding};
 use actix_service::{Service, Transform};
 use actix_utils::future::{ok, Either, Ready};
 use futures_core::ready;
@@ -19,7 +19,7 @@ use pin_project_lite::pin_project;
 use crate::{
     body::{EitherBody, MessageBody},
     http::{
-        header::{self, AcceptEncoding, ContentEncoding, Encoding, HeaderValue},
+        header::{self, AcceptEncoding, Encoding, HeaderValue},
         StatusCode,
     },
     service::{ServiceRequest, ServiceResponse},
@@ -108,17 +108,17 @@ struct Inner {
     zstd: Option<u32>,
 }
 
-// impl Inner {
-//     pub fn level(&self, encoding: &ContentEncoding) -> Option<u32> {
-//         match encoding {
-//             ContentEncoding::Deflate => self.deflate,
-//             ContentEncoding::Gzip => self.gzip,
-//             ContentEncoding::Brotli => self.brotli,
-//             ContentEncoding::Zstd => self.zstd,
-//             _ => None,
-//         }
-//     }
-// }
+impl Inner {
+    pub fn level(&self, encoding: &ContentEncoding) -> Option<u32> {
+        match encoding {
+            ContentEncoding::Deflate => self.deflate,
+            ContentEncoding::Gzip => self.gzip,
+            ContentEncoding::Brotli => self.brotli,
+            ContentEncoding::Zstd => self.zstd,
+            _ => None,
+        }
+    }
+}
 
 impl Compress {
     /// Set deflate compression level.
@@ -293,8 +293,8 @@ where
                     } else {
                         ContentEncoding::Identity
                     };
-
-                    EitherBody::left(Encoder::response(enc, head, body))
+                    let level = this.inner.level(&enc);
+                    EitherBody::left(Encoder::response_with_level(enc, head, body, level))
                 })))
             }
 
